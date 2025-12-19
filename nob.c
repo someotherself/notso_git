@@ -20,6 +20,8 @@ int main(int argc, char **argv) {
         SRC_FOLDER"hash-object.c",
         SRC_FOLDER"objects.c",
         SRC_FOLDER"cat-file.c",
+        SRC_FOLDER"ls-tree.c",
+        SRC_FOLDER"write-tree.c",
         "-lcrypto", "-lz"
     );
 

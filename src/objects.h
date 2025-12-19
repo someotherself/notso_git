@@ -31,8 +31,24 @@ struct str_to_obj_t {
 
 extern const struct str_to_obj_t head_conversion[];
 
+struct mode_to_obj_t {
+    obj_type_t type;
+    const char *mode;
+};
+
+extern const struct mode_to_obj_t mode_conversion[];
+
+struct mode_to_str {
+    char *str;
+    const char *mode;
+};
+
+extern const struct mode_to_str mode_str_conversion[];
+
 // https://stackoverflow.com/questions/16844728/converting-from-string-to-enum-in-c
 obj_type_t obj_t_from_str(const char *str);
+obj_type_t obj_t_from_mode(const char *mode);
+char* mode_to_str(const char *mode);
 
 typedef struct {
     unsigned char *data;
@@ -55,5 +71,8 @@ typedef struct {
 
 int parse_header(buf_t *src, header_t *header);
 int read_contents(buf_t *src, header_t *header);
+int decompress_object(buf_t *src, buf_t *dst);
+int read_object(buf_t *object_contents, char object_name[], const char* oid_name);
+void oid_to_hex(const unsigned char oid[20], char hex[41]);
 
 #endif

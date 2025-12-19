@@ -2,8 +2,12 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <zlib.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #include "objects.h"
+#include "ls-tree.h"
 
 // ----------------------------
 // dyn array
@@ -56,6 +60,19 @@ int buf_grow(buf_t *b, size_t extra) {
     b->data = p;
     b->cap = new_cap;
     return 0;
+}
+
+// ----------------------------
+// hex
+// ----------------------------
+
+void oid_to_hex(const unsigned char oid[20], char hex[41]) {
+    static const char *digits = "0123456789abcdef";
+    for (int i = 0; i < 20; i++) {
+        hex[i*2 + 0] = digits[(oid[i] >> 4) & 0xF];
+        hex[i*2 + 1] = digits[oid[i] & 0xF];
+    }
+    hex[40] = '\0';
 }
 
 // ----------------------------
@@ -123,6 +140,42 @@ obj_type_t obj_t_from_str(const char *str) {
     return OBJ_UNKNOWN;
 }
 
+const struct mode_to_obj_t mode_conversion[] = {
+    {OBJ_BLOB, "100644"},
+    {OBJ_TREE, "40000"},
+    {OBJ_COMMIT, "160000"},
+    {OBJ_UNKNOWN, ""},
+};
+
+obj_type_t obj_t_from_mode(const char *mode) {
+    int i;
+    for (i = 0; i< (int)(sizeof(mode_conversion) / sizeof(mode_conversion[0])); i++) {
+        if (strcmp(mode, mode_conversion[i].mode) == 0) {
+            return mode_conversion[i].type;
+        }
+    };
+    return OBJ_UNKNOWN;
+}
+
+const struct mode_to_str mode_str_conversion[] = {
+    {"blob", "100644"},
+    {"blob", "120000"},
+    {"blob", "100755"},
+    {"tree", "40000"},
+    {"commit", "160000"},
+};
+
+char* mode_to_str(const char *mode) {
+    int i;
+    for (size_t i = 0; i < (sizeof(mode_str_conversion) / sizeof(mode_str_conversion[0])); i++) {
+        if (strcmp(mode, mode_str_conversion[i].mode) == 0) {
+            return mode_str_conversion[i].str;
+        }
+    }
+    return "unknown";
+}
+
+// Reads the header of a blob, tree or commit to get object type and payload size
 int parse_header(buf_t *src, header_t *header) {
     if (!src || !header || !src->data) return -1;
 
@@ -162,14 +215,98 @@ int parse_header(buf_t *src, header_t *header) {
 // Object payload
 // ----------------------------
 
+/// Finds the objects (blob, tree or commit) and reads the (compressed) contents into object_contents
+int read_object(buf_t *object_contents, char object_folder[], const char* oid_name) {
+    int obj_fd;
+
+    char d_path[BUFSIZ] = { 0 };
+    char dir_name[3];
+    oid_dir_str(oid_name, dir_name);
+    concat_path(d_path, object_folder, dir_name);
+
+    char f_path[BUFSIZ] = { 0 };
+    char file_name[60];
+    oid_file_str(oid_name, file_name);
+    concat_path(f_path, d_path, file_name);
+
+    struct stat stat_buf = { 0 };
+    if (stat(f_path, &stat_buf) < 0) {
+        fprintf(stderr, "Could not open source file %s (%s)\n", f_path, strerror(errno));
+        return -1;
+    }
+    buf_reserve(object_contents, stat_buf.st_size);
+
+    if ((obj_fd = open(f_path, O_RDONLY)) < 0) {
+        return -1;
+    }
+
+    // TODO: Create a read_all function
+    int b_read;
+    if ((b_read = read(obj_fd, object_contents->data, object_contents->cap)) < 0) {
+        fprintf(stderr, "Failed to read object to blob (%s)\n", strerror(errno));
+        close(obj_fd);
+        return -1;
+    }
+    object_contents->len = b_read;
+
+    close(obj_fd);
+    return 0;
+}
+
+int decompress_object(buf_t *src, buf_t *dst) {
+    z_stream strm = {0};
+
+    if (inflateInit(&strm) != Z_OK) {
+        return -1;
+    }
+
+    strm.next_in = src->data;
+    strm.avail_in = src->len;
+
+    int ret;
+    do {
+        if (buf_grow(dst, 1024) < 0) {
+            inflateEnd(&strm);
+            return -1;
+        }
+
+        strm.next_out = dst->data + dst->len;
+        strm.avail_out = dst->cap + dst->len;
+
+        ret = inflate(&strm, Z_NO_FLUSH);
+
+        if (ret != Z_OK && ret != Z_STREAM_END) {
+            inflateEnd(&strm);
+            return -1;
+        }
+
+        dst->len = dst->cap - strm.avail_out;
+
+    } while (ret != Z_STREAM_END);
+    inflateEnd(&strm);
+    return 0;
+}
+
+
 int read_contents(buf_t *src, header_t *header) {
+    unsigned char *nul = memchr(src->data, '\0', src->len);
+    if (nul == NULL) return -1;
+    size_t header_len = (size_t)(nul - src->data + 1);
+    char content_buf[header->size + 1];
+
     if (header->obj_type == OBJ_BLOB) {
-        unsigned char *nul = memchr(src->data, '\0', src->len);
-        size_t header_len = (size_t)(nul - src->data + 1);
-        if (nul == NULL) return -1;
-        char content_buf[header->size + 1];
         memcpy(content_buf, src->data + header_len, header->size);
+        content_buf[header->size] = '\0'; // Null terminator for printing
         printf("%s", content_buf);
+    }
+
+    if (header->obj_type == OBJ_TREE) {
+        memcpy(content_buf, src->data + header_len, header->size);
+        read_tree(content_buf, header->size);
+    }
+
+    if (header->obj_type == OBJ_COMMIT) {
+        printf("Not implemented for commits.\n");
     }
 
     return 0;

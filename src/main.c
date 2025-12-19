@@ -7,6 +7,8 @@
 #include "init.h"
 #include "hash-object.h"
 #include "cat-file.h"
+#include "write-tree.h"
+#include "ls-tree.h"
 
 #ifndef __linux__
 int main(void) {
@@ -21,11 +23,13 @@ typedef enum {
     USAGE_INIT,
     USAGE_HASH_OBJECT,
     USAGE_CAT_FILE,
+    USAGE_LS_TREE,
+    USAGE_WRITE_TREE,
     // Command not recognized
     USAGE_INVALID,
 } usage_t;
 
-void usage(usage_t u, ...) {
+void usage(usage_t u) {
     switch (u) {
         case USAGE_GEN:
             break;
@@ -34,6 +38,10 @@ void usage(usage_t u, ...) {
         case USAGE_HASH_OBJECT:
             break;
         case USAGE_CAT_FILE:
+            break;
+        case USAGE_LS_TREE:
+            break;
+        case USAGE_WRITE_TREE:
             break;
         case USAGE_INVALID:
             fprintf(stderr, "Not a valid command\n");
@@ -55,6 +63,7 @@ int run(int argc, char **argv) {
             return 1;
         }
         init();
+        return 0;
     }
 
     if (strcmp(argv[1], "hash-object") == 0) {
@@ -104,8 +113,9 @@ int run(int argc, char **argv) {
         }
 
         if (argc == 3) {
-            if (strlen(argv[2]) >= sizeof(oid_name)) {
-                fprintf(stderr, "Input is too long\n");
+            if (strlen(argv[2]) > 40) {
+                // However, searching short hashes is not implemented
+                fprintf(stderr, "Invalid input\n");
                 return -1;
             }
             strncpy(oid_name, argv[2], sizeof(oid_name) - 1);
@@ -115,8 +125,8 @@ int run(int argc, char **argv) {
 
         if (strcmp(argv[2], "-p") == 0) {
             pretty = 1;
-            if (strlen(argv[3]) >= sizeof(oid_name)) {
-                fprintf(stderr, "Input is too long\n");
+            if (strlen(argv[3]) > 40) {
+                fprintf(stderr, "Invalid input\n");
                 return -1;
             }
             strncpy(oid_name, argv[3], sizeof(oid_name) - 1);
@@ -130,6 +140,32 @@ int run(int argc, char **argv) {
             return 1;
         } 
     }
+
+    if (strcmp(argv[1], "write-tree") == 0) {
+        if (argc > 2) {
+            usage(USAGE_WRITE_TREE);
+            return 1;
+        }
+        write_tree();
+        return 0;
+    }
+
+    if (strcmp(argv[1], "ls-tree") == 0) {
+        char oid_name[4096];
+
+        if (argc != 3) {
+            usage(USAGE_LS_TREE);
+            return 1;
+        }
+        if (strlen(argv[2]) > 40) {
+            fprintf(stderr, "Invalid input\n");
+            return -1;
+        }
+        strncpy(oid_name, argv[2], sizeof(oid_name) - 1);
+        ls_tree(oid_name);
+        return 0;
+    }
+
 
     usage(USAGE_INVALID);
     return 0;

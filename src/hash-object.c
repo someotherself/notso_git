@@ -153,7 +153,7 @@ int hash_object(int write, char *file) {
 
     struct stat stat_buf;
     if (stat(file, &stat_buf) < 0) {
-        fprintf(stderr, "Could not open source file %s (%s)\n", file, strerror(errno));
+        fprintf(stderr, "Could not check stats %s (%s)\n", file, strerror(errno));
         close(fd);
         return -1;
     }
