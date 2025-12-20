@@ -36,7 +36,7 @@ FILE="$T/file.txt"
 printf "hello hello hello hello hello hello hello hello hello \n" > "$FILE"
 
 # Create a base repo in the tmp folder
-"$BIN" init || fail "init failed"
+"$BIN" init >/dev/null || fail "init failed"
 
 # Capture output of hash-object -w
 FILE="$T/file.txt"
@@ -52,7 +52,7 @@ then
 fi
 
 # Create a normal git repo
-git init || fail "init failed"
+git init >/dev/null || fail "init failed"
 
 # Hash the same file
 GIT_HASH="$(git hash-object "$FILE")" || fail "hash-object failed"

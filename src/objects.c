@@ -66,6 +66,7 @@ int buf_grow(buf_t *b, size_t extra) {
 // hex
 // ----------------------------
 
+// Convert 20 bytes binary sha-1 to a 40 char hex string
 void oid_to_hex(const unsigned char oid[20], char hex[41]) {
     static const char *digits = "0123456789abcdef";
     for (int i = 0; i < 20; i++) {
