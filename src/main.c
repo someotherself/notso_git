@@ -5,6 +5,7 @@
 #include <assert.h>
 
 #include "init.h"
+#include "add.h"
 #include "hash-object.h"
 #include "cat-file.h"
 #include "write-tree.h"
@@ -21,6 +22,7 @@ typedef enum {
     // Info on generic usage
     USAGE_GEN = 0,
     USAGE_INIT,
+    USAGE_ADD,
     USAGE_HASH_OBJECT,
     USAGE_CAT_FILE,
     USAGE_LS_TREE,
@@ -32,16 +34,38 @@ typedef enum {
 void usage(usage_t u) {
     switch (u) {
         case USAGE_GEN:
+            fprintf(stderr,
+                "usage: ./notsogit <command> [<args>]\n");
             break;
         case USAGE_INIT:
+            fprintf(stderr,
+                "usage: ./notsogit init\n"
+                "Create an empty repository.\n");
+            break;
+        case USAGE_ADD:
+            fprintf(stderr,
+                "usage: ./notsogit add <path>\n"
+                "Add file contents to the staging area.\n");
             break;
         case USAGE_HASH_OBJECT:
+            fprintf(stderr,
+                "usage: ./notsogit hash-object [-w] <file>\n"
+                "Compute object ID and optionally write object to database.\n");
             break;
         case USAGE_CAT_FILE:
+            fprintf(stderr,
+                "usage: ./notsogit cat-file -p <object>\n"
+                "Pretty-print object contents.\n");
             break;
         case USAGE_LS_TREE:
+            fprintf(stderr,
+                "usage: ./notsogit ls-tree <tree>\n"
+                "List the contents of a tree object.\n");
             break;
         case USAGE_WRITE_TREE:
+            fprintf(stderr,
+                "usage: ./notsogit write-tree\n"
+                "Create a tree object from the staging area.\n");
             break;
         case USAGE_INVALID:
             fprintf(stderr, "Not a valid command\n");
@@ -59,10 +83,19 @@ int run(int argc, char **argv) {
 
     if (strcmp(argv[1], "init") == 0) {
         if (argc > 2) {
-            usage(USAGE_GEN);
+            usage(USAGE_INIT);
             return 1;
         }
         init();
+        return 0;
+    }
+
+    if (strcmp(argv[1], "add") == 0) {
+        if (argc > 2) {
+            usage(USAGE_ADD);
+            return 1;
+        }
+        add();
         return 0;
     }
 
