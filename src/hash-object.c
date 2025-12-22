@@ -20,18 +20,16 @@ int create_blob(Oid *oid, int fd, buf_t *obj, size_t size) {
     }
 
     if (buf_append(obj, header, (size_t)header_len) < 0) {
-        printf("Buf append error\n");
         return -1;
     }
 
-    unsigned char tmp[BUFSIZ];
-    for (;;) {
-        ssize_t n = read(fd, tmp, sizeof(tmp));
-        if (n < 0) return -1;
-        if (n == 0) break;
-        // Write the bytes to the object
-        if (buf_append(obj, tmp, (size_t)n) < 0) return -1;
+    buf_reserve(obj, size);
+    unsigned char tmp[size];
+    ssize_t n = read_all(fd, tmp, size);
+    if (n < 0) {
+        return -1;
     }
+    buf_append(obj, tmp, size);
 
     // Create the SHA1
     SHA_CTX ctx;
@@ -46,12 +44,18 @@ int create_target(Oid *oid, char *repo) {
     int fd;
 
     char o_path[BUFSIZ];
-    concat_path(o_path, repo, "objects");
+    if (concat_path(o_path, sizeof(o_path), repo, "objects") < 0) {
+        fprintf(stderr, "Path too long: repo/objects\n");
+        return -1;
+    };
 
     char d_path[BUFSIZ];
     char dir_name[10];
     oid_dir(oid, dir_name);
-    concat_path(d_path, o_path, dir_name);
+    if (concat_path(d_path, sizeof(d_path), o_path, dir_name) < 0) {
+        fprintf(stderr, "Path too long: repo/objects/HASH\n");
+        return -1;
+    };
     if (mkdir(d_path, 0755) < 0) {
         if (errno != EEXIST) {
             return -1;
@@ -61,7 +65,10 @@ int create_target(Oid *oid, char *repo) {
     char f_path[BUFSIZ];
     char file_name[60];
     oid_file(oid, file_name);
-    concat_path(f_path, d_path, file_name);
+    if (concat_path(f_path, sizeof(f_path), d_path, file_name) < 0) {
+        fprintf(stderr, "Path too long: repo/objects/HASH/HASH\n");
+        return -1;
+    };
     if (access(f_path, F_OK) == 0) {
         return 0;
     } 
@@ -112,16 +119,21 @@ int hash_file(Oid *oid, int fd, struct stat *stat_buf, char *repo, int write_arg
     // Create and open a blob file
     if ((oid_fd = create_target(oid, repo)) < 0) { 
         fprintf(stderr, "Could not create blob target (%s)\n", strerror(errno));
+        free_buf(&oid_content);
+        free_buf(&compressed);
         return -1;
     }
     if (oid_fd == 0) {
         // Blob already exists
+        free_buf(&oid_content);
+        free_buf(&compressed);
         return 0;
     }
 
     // TODO: Create a write_all function
+    // ssize_t n = write_all(oid_fd, compressed.data, compressed.len);
     int n = write(oid_fd, compressed.data, compressed.len);
-    if (n < 0) {
+    if (n < 0 || (size_t)n != compressed.len) {
         // Early return
         fprintf(stderr, "Failed to write to blob (%s)\n", strerror(errno));
         close(oid_fd);
@@ -139,7 +151,7 @@ int hash_file(Oid *oid, int fd, struct stat *stat_buf, char *repo, int write_arg
 int hash_object(int write, char *file) {
     char base[BUFSIZ] = { 0 };
     if (find_base(base, sizeof(base)) == -1) {
-        fprintf(stderr, "Could not find repo %s (%s)\n", file, strerror(errno));
+        fprintf(stderr, "Could not find repo (%s)\n", strerror(errno));
         return -1;
     }
 
@@ -172,3 +184,4 @@ int hash_object(int write, char *file) {
     close(fd);
     return 0;
 }
+

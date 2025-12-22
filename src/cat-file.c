@@ -8,13 +8,17 @@
 
 int cat_file(char *oid_name, int pretty) {
     char base[BUFSIZ] = { 0 };
+    UNUSED(pretty);
 
     if (find_base(base, sizeof(base)) == -1) {
         fprintf(stderr, "Could not find repo (%s)\n", strerror(errno));
         return -1;
     }
     char obj_folder[BUFSIZ] = { 0 };
-    concat_path(obj_folder, base, "objects");
+    if (concat_path(obj_folder, sizeof(obj_folder), base, "objects") < 0) {
+        fprintf(stderr, "Path too long: repo/objects\n");
+        return -1;
+    };
 
     buf_t compressed_object;
     buf_init(&compressed_object);

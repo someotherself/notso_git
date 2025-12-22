@@ -8,6 +8,9 @@
 #define HASH_HEX_LEN 40
 #define MAX_PATH     4096
 
+// https://stackoverflow.com/questions/3599160/how-can-i-suppress-unused-parameter-warnings-in-c
+#define UNUSED(x) (void)(x)
+
 typedef struct {
     unsigned char hash[SHA_DIGEST_LENGTH];
 } Oid;
@@ -62,7 +65,7 @@ void buf_reserve(buf_t *b, size_t s);
 int buf_append(buf_t *b, const void *data, size_t s);
 int buf_grow(buf_t *b, size_t extra);
 
-void concat_path(char *out, char* p1, char* p2);
+int concat_path(char *out, size_t out_size, const char* p1, const char* p2);
 
 typedef struct {
     obj_type_t obj_type;
@@ -74,5 +77,8 @@ int read_contents(buf_t *src, header_t *header);
 int decompress_object(buf_t *src, buf_t *dst);
 int read_object(buf_t *object_contents, char object_name[], const char* oid_name);
 void oid_to_hex(const unsigned char oid[20], char hex[41]);
+
+int read_all(const int fd, unsigned char *buf, size_t size);
+int write_all(const int fd, unsigned char *buf, size_t size);
 
 #endif

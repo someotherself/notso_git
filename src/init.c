@@ -65,7 +65,10 @@ int setup_base_dir(char *root) {
     int head_fd;
 
     // .notso_git
-    concat_path(base, root, ".notso_git");
+    if (concat_path(base, sizeof(base), root, ".notso_git") < 0) {
+        fprintf(stderr, "Path to repo too long\n");
+        return -1;
+    };
     struct stat statbuf = {0};
     if (stat(base, &statbuf) < 0) {
         if (mkdir(base, 0755) < 0) {
@@ -91,7 +94,7 @@ int setup_base_dir(char *root) {
             return -1;
         };
     }
-    // refs/
+// refs/
     snprintf(temp, sizeof(temp), "%s%s", base, "/refs");
     if (stat(temp, &statbuf) < 0) {
         if (mkdir(temp, 0755) < 0) {

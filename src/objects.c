@@ -24,7 +24,7 @@ void free_buf(buf_t *b) {
 
 void buf_reserve(buf_t *b, size_t s) {
     if (b->cap < s) {
-        int new_cap = s;
+        size_t new_cap = s;
         void *p = realloc(b->data, new_cap);
         b->data = p;
         b->cap = new_cap;
@@ -104,20 +104,10 @@ void oid_file_str(const char *oid_hex, char out[39]) {
     out[38] = '\0';
 }
 
-// Concatenates 2 path components to create a valid path
-// Handles cases where both ends contain '/', only one, or neither.
-// Paths must be valid
-// TODO: Add error checking and use static p1 and p2
-void concat_path(char *out, char* p1, char* p2) {
-    
-    if (p1[strlen(p1) - 1] == 47 && p2[0] == 47) {
-        p1[strlen(p1) - 1] = 0;
-    }
-    if (p1[strlen(p1) - 1] == 47 || p2[0] == 47) {
-        snprintf(out, MAX_PATH, "%s%s", p1, p2);
-        return;
-    }
-    snprintf(out, MAX_PATH, "%s/%s", p1, p2);
+// Concatenates 2 path components 
+int concat_path(char *out, size_t out_size, const char* p1, const char* p2) {
+    int n = snprintf(out, out_size, "%s/%s", p1, p2);
+    return (n >= 0 && (size_t)n < out_size) ? 0 : -1;
 }
 
 // ----------------------------
@@ -167,7 +157,6 @@ const struct mode_to_str mode_str_conversion[] = {
 };
 
 char* mode_to_str(const char *mode) {
-    int i;
     for (size_t i = 0; i < (sizeof(mode_str_conversion) / sizeof(mode_str_conversion[0])); i++) {
         if (strcmp(mode, mode_str_conversion[i].mode) == 0) {
             return mode_str_conversion[i].str;
@@ -223,12 +212,18 @@ int read_object(buf_t *object_contents, char object_folder[], const char* oid_na
     char d_path[BUFSIZ] = { 0 };
     char dir_name[3];
     oid_dir_str(oid_name, dir_name);
-    concat_path(d_path, object_folder, dir_name);
+    if (concat_path(d_path, sizeof(d_path), object_folder, dir_name) < 0) {
+        fprintf(stderr, "Path too long: repo/objects/HASH\n");
+        return -1;
+    };
 
     char f_path[BUFSIZ] = { 0 };
     char file_name[60];
     oid_file_str(oid_name, file_name);
-    concat_path(f_path, d_path, file_name);
+    if (concat_path(f_path, sizeof(f_path), d_path, file_name) < 0) {
+        fprintf(stderr, "Path too long: repo/objects/HASH/HASH\n");
+        return -1;
+    };
 
     struct stat stat_buf = { 0 };
     if (stat(f_path, &stat_buf) < 0) {
@@ -272,7 +267,7 @@ int decompress_object(buf_t *src, buf_t *dst) {
         }
 
         strm.next_out = dst->data + dst->len;
-        strm.avail_out = dst->cap + dst->len;
+        strm.avail_out = dst->cap - dst->len;
 
         ret = inflate(&strm, Z_NO_FLUSH);
 
@@ -287,7 +282,6 @@ int decompress_object(buf_t *src, buf_t *dst) {
     inflateEnd(&strm);
     return 0;
 }
-
 
 int read_contents(buf_t *src, header_t *header) {
     unsigned char *nul = memchr(src->data, '\0', src->len);
@@ -311,4 +305,39 @@ int read_contents(buf_t *src, header_t *header) {
     }
 
     return 0;
+}
+
+// ----------------------------
+// fs functions
+// ----------------------------
+
+int read_all(const int fd, unsigned char *buf, size_t size) {
+    size_t b_read = 0;
+    for (;;) {
+        ssize_t n = read(fd, buf + b_read, size - b_read);
+        if (n < 0) {
+            if (errno == EINTR) continue;
+            return -1;
+        };
+        if (n == 0) break;
+        b_read += n;
+    }
+    return b_read;
+}
+
+int write_all(const int fd, unsigned char *buf, size_t size) {
+    size_t b_written = 0;
+    while (b_written < size) {
+        ssize_t n = write(fd, buf + b_written, size - b_written);
+        if (n < 0) {
+            if (errno == EINTR) continue;
+            return -1;
+        };
+        if (n == 0) {
+            errno = EIO;
+            return -1;
+        };
+        b_written += n;
+    }
+    return b_written;
 }

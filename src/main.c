@@ -91,17 +91,23 @@ int run(int argc, char **argv) {
     }
 
     if (strcmp(argv[1], "add") == 0) {
-        if (argc > 2) {
+        if (argc != 3) {
             usage(USAGE_ADD);
             return 1;
         }
-        add();
+        char path[MAX_PATH];
+        if (strlen(argv[2]) >= sizeof(path)) {
+            fprintf(stderr, "Input is too long\n");
+            return -1;
+        }
+        strncpy(path, argv[2], sizeof(path) - 1);
+        add(path);
         return 0;
     }
 
     if (strcmp(argv[1], "hash-object") == 0) {
         int write = 0;
-        char file_path[4096];
+        char file_path[MAX_PATH];
 
         if (argc < 3 || argc > 4) {
             usage(USAGE_HASH_OBJECT);

@@ -53,6 +53,6 @@ int read_tree(char *contents, size_t content_len) {
 }
 
 int ls_tree(char *oid_name) {
-
+    UNUSED(oid_name);
     return 0;
 }

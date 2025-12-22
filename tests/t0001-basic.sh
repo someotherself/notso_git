@@ -44,7 +44,7 @@ HASH="$($VALGRIND "$BIN" hash-object -w "$FILE")" || fail "hash-object failed"
 
 # Capture output of cat-file
 OUT="$T/output.txt"
-$VALGRIND "$BIN" cat-file "$HASH" > $OUT || fail "cat-file failed"
+$VALGRIND "$BIN" cat-file -p "$HASH" > $OUT || fail "cat-file failed"
 
 if ! cmp -s $FILE $OUT
 then
