@@ -18,9 +18,9 @@ fail() { echo "FAIL t0001-basic.sh: $*" >&2; exit 1; }
 pass() { echo "PASS t0001-basic.sh"; }
 
 T="$(mktemp -d /tmp/notsogit-test.XXXXXX)"
-trap cleanup EXIT INT TERM
+# trap cleanup EXIT INT TERM
 
-cleanup() { rm -rf "$T"; }
+# cleanup() { rm -rf "$T"; }
 
 VALGRIND="valgrind --quiet --tool=memcheck --leak-check=full --show-leak-kinds=all \
   --errors-for-leak-kinds=definite,indirect,possible \
@@ -62,6 +62,6 @@ then
     fail "git and notsogit diff hash"
 fi
 
-cleanup
+# cleanup
 
 pass

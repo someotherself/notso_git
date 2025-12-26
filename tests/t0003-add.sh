@@ -7,9 +7,9 @@ pass() { echo "PASS t0003-add.sh"; }
 
 
 T="$(mktemp -d /tmp/notsogit-test.XXXXXX)"
-trap cleanup EXIT INT TERM
+# trap cleanup EXIT INT TERM
 
-cleanup() { rm -rf "$T"; }
+# cleanup() { rm -rf "$T"; }
 
 VALGRIND="valgrind --quiet --tool=memcheck --leak-check=full --show-leak-kinds=all \
   --errors-for-leak-kinds=definite,indirect,possible \
@@ -70,5 +70,7 @@ LS_FILES="$($VALGRIND "$BIN" ls-files)"
 EXPECTED_LS_FILES="$(git ls-files)"
 
 cmp -s "$INDEX" "$EXPECTED" || fail "LS-FILES do not match."
+
+# cleanup
 
 pass

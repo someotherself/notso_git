@@ -11,8 +11,8 @@ pass() { echo "PASS t0002-cat-file-tree.sh"; }
 
 T="$(mktemp -d /tmp/notsogit-test.XXXXXX)"
 
-cleanup() { rm -rf "$T"; }
-trap cleanup EXIT INT TERM
+# cleanup() { rm -rf "$T"; }
+# trap cleanup EXIT INT TERM
 
 VALGRIND="valgrind --quiet --tool=memcheck --leak-check=full --show-leak-kinds=all \
   --errors-for-leak-kinds=definite,indirect,possible \
@@ -45,6 +45,6 @@ if ! cmp -s "$OUT" "$GIT_OUT"; then
     fail "files differ"
 fi
 
-cleanup
+# cleanup
 
 pass

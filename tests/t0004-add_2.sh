@@ -6,9 +6,9 @@ pass() { echo "PASS t0003-add.sh"; }
 
 
 T="$(mktemp -d /tmp/notsogit-test.XXXXXX)"
-trap cleanup EXIT INT TERM
+# trap cleanup EXIT INT TERM
 
-cleanup() { rm -rf "$T"; }
+# cleanup() { rm -rf "$T"; }
 
 VALGRIND="valgrind --quiet --tool=memcheck --leak-check=full --show-leak-kinds=all \
   --errors-for-leak-kinds=definite,indirect,possible \
@@ -35,5 +35,7 @@ cp "$INDEX" "$GIT"
 OUT="$(git ls-files)"
 echo "$OUT"
 cmp -s "$OUT" "$TARGET" || fail Wrong output
+
+# cleanup
 
 pass
