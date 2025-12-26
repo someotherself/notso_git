@@ -1,9 +1,8 @@
 #!/bin/sh
 set -eu
 
-fail() { echo "FAIL t0003-add.sh: $*" >&2; exit 1; }
-pass() { echo "PASS t0003-add.sh"; }
-
+fail() { echo "FAIL t0004-add_2.sh: $*" >&2; exit 1; }
+pass() { echo "PASS t0004-add_2.sh"; }
 
 T="$(mktemp -d /tmp/notsogit-test.XXXXXX)"
 # trap cleanup EXIT INT TERM
@@ -33,7 +32,6 @@ GIT="$T/.git"
 cp "$INDEX" "$GIT"
 
 OUT="$(git ls-files)"
-echo "$OUT"
 cmp -s "$OUT" "$TARGET" || fail Wrong output
 
 # cleanup

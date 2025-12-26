@@ -10,12 +10,15 @@
 #include "init.h"
 #include "index.h"
 
+// Compare function used by qsort to to sort index entries by path.
 static int cmp_entry_path(const void *a, const void *b) {
     const index_entry_t *ea = (const index_entry_t *)a;
     const index_entry_t *eb = (const index_entry_t *)b;
     return strcmp(ea->path, eb->path);
 }
 
+/// @brief Helper for the qsort function in stdlib. Sorts the index entries by path.
+/// @param index In memory index state
 void sort_index(index_state_t *index) {
     if (index->entries_count == 0) {
         return;
@@ -23,6 +26,11 @@ void sort_index(index_state_t *index) {
     qsort(&index->entries[0], index->entries_count, sizeof(index_entry_t), cmp_entry_path);
 }
 
+/// @brief Prepare the in memory index state. If index exists on disk, it reads it into memory. Otherwise, index is initialized.
+/// @param base Path to the notso_git repository
+/// @param index Empty in memory index.
+/// @param idx_contents buf_t array to holde the raw contents of the index file before parsing. TODO: Move inside function.
+/// @return -1 on error.
 int init_index(char *base, index_state_t *index, buf_t *idx_contents) {
     // Check if an index already exists and read it in memory
     char index_path[BUFSIZ] = { 0 };

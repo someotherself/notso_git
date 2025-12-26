@@ -17,12 +17,14 @@
 #include "objects.h"
 #include "hash-object.h"
 
+// Compare function used by bsearch to sort index entries by path.
 int cmp_path_key_to_entry(const void *key, const void *elem) {
     const char *k = key;
     const index_entry_t *e = elem;
     return strcmp(k, e->path);
 }
 
+// Reads a uint32_t and converts it FROM big endian.
 uint32_t read_be32(const unsigned char *p) {
     return ((uint32_t)p[0] << 24) |
            ((uint32_t)p[1] << 16) |
@@ -30,6 +32,7 @@ uint32_t read_be32(const unsigned char *p) {
            ((uint32_t)p[3] <<  0);
 }
 
+// Reads a uint32_t and converts it FROM big endian. Advances the cursor by the size of a uint32_t
 uint32_t read_be32_seek(const unsigned char *p, size_t *n) {
     const unsigned char *a = p + *n;
     *n += 4;
@@ -39,11 +42,13 @@ uint32_t read_be32_seek(const unsigned char *p, size_t *n) {
            ((uint32_t)a[3] <<  0);
 }
 
+// Reads a uint16_t and converts it FROM big endian.
 uint16_t read_be16(const unsigned char *p) {
     return ((uint16_t)p[0] << 8) |
            ((uint16_t)p[1] << 0);
 }
 
+// Reads a uint16_t and converts it FROM big endian. Advances the cursor by the size of a uint16_t
 uint16_t read_be16_seek(const unsigned char *p, size_t *n) {
     const unsigned char *a = p + *n;
     *n += 2;
@@ -51,12 +56,17 @@ uint16_t read_be16_seek(const unsigned char *p, size_t *n) {
            ((uint16_t)a[1] << 0);
 }
 
+// Converts to big endian and writes a single uint32_t  to the byte array and advances the cursor the the size of teh uint32_t
 void cpy_uint32_seek(unsigned char *buf, uint32_t value, size_t *off) {
     uint32_t bytes = htonl(value);
     memcpy(buf + *off, &bytes, sizeof(uint32_t));
     *off += 4;
 }
 
+/// @brief Writes an idividual index entry to disk (in a temporary file)
+/// @param fd File descriptor to the temporary file.
+/// @param entry Pointer to the index entry
+/// @return -1 on error
 int write_index_entry(int fd, index_entry_t *entry) {
     unsigned char buf[BUFSIZ] = { 0 };
     size_t offset = 0;
@@ -94,6 +104,10 @@ int write_index_entry(int fd, index_entry_t *entry) {
     return 0;
 }
 
+/// @brief Writes the index header to the temprary file
+/// @param fd File descriptor to the temporary file.
+/// @param index In memory index state
+/// @return Does not return errors. TODO
 int write_index_header(int fd, index_state_t *index) {
     unsigned char head[12];
     memcpy(head, "DIRC", 4);
@@ -107,6 +121,10 @@ int write_index_header(int fd, index_state_t *index) {
     return write_all(fd, head, 12);
 }
 
+/// @brief Reads back the index file, creates the SHA1 checksum and writes it to the index file.
+/// @param fd File descriptor to the temporary file.
+/// @param tmp_path Path to the temprary file.
+/// @return -1 on error
 int sha_checksum(int fd, char *tmp_path) {
     SHA_CTX ctx;
     SHA1_Init(&ctx);
@@ -173,8 +191,10 @@ int write_index_to_file(char *path, index_state_t *index) {
     return 0;
 }
 
-// Will check if the entry (path) already exists in the index, and if the HASH is the same
-// Sorts the entries again after inserting a new entry
+/// @brief Will check if the entry (path) already exists in the index, and if the HASH is the same. Sorts the entries again after inserting a new entry
+/// @param index In memory index state.
+/// @param entry Index entry created by `read_entries` or `create_entry`
+/// @return -1 on error
 int append_entry(index_state_t *index, index_entry_t *entry) {
     if (entry == NULL || index == NULL) {
         return -1;
@@ -216,6 +236,7 @@ int append_entry(index_state_t *index, index_entry_t *entry) {
     return 0;
 }
 
+/// @brief Initializes the index state struct. Should always be called when creating the struct
 void init_index_state(index_state_t *index) {
     index->version = 2;
     index->entries_count = 0;
@@ -240,6 +261,11 @@ void free_entry(index_entry_t *entry) {
     entry->path = NULL;
 }
 
+/// @brief Used by read_index_target (during `add` command) to add an individual regular file to the index.
+/// @param path Path to the regular file.
+/// @param stat_buf stat struct obtained from stat() for the regular file
+/// @param index In memory index state.
+/// @return -1 on error
 int create_entry(char *path, struct stat *stat_buf, index_state_t *index) {
     index_entry_t idx_e = { 0 };
 
@@ -272,6 +298,10 @@ int create_entry(char *path, struct stat *stat_buf, index_state_t *index) {
     return 0;
 }
 
+/// @brief Used by `add`. Takes a path and adds all the files to the index. Will search directories recursively.
+/// @param path Relative path received from the user.
+/// @param index In memory index state.
+/// @return -1 on error
 int read_index_target(char *path, index_state_t *index) {
     struct stat stat_buf;
     if (stat(path, &stat_buf) < 0) {
@@ -319,6 +349,11 @@ int read_index_target(char *path, index_state_t *index) {
     return 0;
 }
 
+/// @brief Reads and parses the contents of index in memory.
+/// @param index Raw contents of the index.
+/// @param out In memory index state, with all the fields parsed.
+/// @param entry_count Number of entries from the index header.
+/// @return -1 on error
 int read_entries(buf_t *index, index_state_t *out, int entry_count) {
     size_t n = 12; // bytes processed. Skip header.
     for (int i = 0; i < entry_count; i++) {
@@ -359,6 +394,9 @@ int read_entries(buf_t *index, index_state_t *out, int entry_count) {
     return 0;
 }
 
+/// @brief Checks the header of the index
+/// @param data Input. Raw contents of the index file
+/// @return The number of entries. Returns -1 on error.
 int parse_index_header(buf_t *data) {
     if (data->len < 12) {
         fprintf(stderr, "index too small: %zu bytes\n", data->len);
@@ -377,6 +415,8 @@ int parse_index_header(buf_t *data) {
     return (int)read_be32(data->data + 8);
 }
 
+/// @brief Used by ls-files to list the files in the index
+/// @param index In memory index
 void read_index(index_state_t *index) {
     printf("read index index->entries_count: %d\n", index->entries_count);
     if (index->entries_count == 0) {

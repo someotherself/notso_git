@@ -3,6 +3,10 @@
 
 #include "objects.h"
 
+/// @brief Used by cat-file to parse and print contents on a tree object.
+/// @param contents Raw, decompressed contents of the tree object.
+/// @param content_len Contents length from the object header.
+/// @return -1 on error
 int read_tree(char *contents, size_t content_len) {
     const unsigned char *cursor = (unsigned char*)contents; // cursor needs to track bytes
     const unsigned char *end = cursor + content_len;

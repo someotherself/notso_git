@@ -16,6 +16,10 @@ static int isdir(const char *p) {
     return S_ISDIR(statbuf.st_mode);
 }
 
+/// @brief Searches for the .notso_git directory. Starts in cwd and searches upwards along the absolute path.
+/// @param out Output containing the path to the folder, if it exists.
+/// @param out_size Size of the ouput buffer.
+/// @return -1 if not found
 int find_base(char *out, size_t out_size) {
     char cur[4096];
     int isdir_ret;
@@ -60,6 +64,9 @@ int find_base(char *out, size_t out_size) {
     }
 }
 
+/// @brief Initializes the .notso_git repository. Does not reinitializes an existing one.
+/// @param root Path to the project directory (without the .notso_git folder)
+/// @return -1 on error.
 int setup_base_dir(char *root) {
     char base[4096], temp[BUFSIZ];
     int head_fd;

@@ -6,6 +6,10 @@
 #include "objects.h"
 #include "init.h"
 
+/// @brief Contains the main logic behind the cat-file commant.
+/// @param oid_name Input. Object SHA1 hash passed in by the user.
+/// @param pretty Not used.
+/// @return -1 on error
 int cat_file(char *oid_name, int pretty) {
     char base[BUFSIZ] = { 0 };
     UNUSED(pretty);

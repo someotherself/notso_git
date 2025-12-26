@@ -10,6 +10,12 @@
 #include "init.h"
 #include "objects.h"
 
+/// @brief Creates a blob in memory.
+/// @param oid Output. Pointer to a `oid_t` struct that will containt the object SHA1 HASH.
+/// @param fd File descriptor to the file file converted to blob.
+/// @param obj Output. Pointer to a `buf_t` struct containing the in memory blob.
+/// @param size Size of the file converted to blob.
+/// @return -1 on error.
 int create_blob(oid_t *oid, int fd, buf_t *obj, size_t size) {
     char header[64];
 
@@ -40,6 +46,10 @@ int create_blob(oid_t *oid, int fd, buf_t *obj, size_t size) {
     return 0;
 }
 
+/// @brief Creates a empty file where a git object will be saved.
+/// @param oid Pointer to a `oid_t` struct that containing the object SHA1 HASH.
+/// @param repo Path to the .notso_git folder
+/// @return -1 on error
 int create_target(oid_t *oid, char *repo) {
     int fd;
 
@@ -80,6 +90,13 @@ int create_target(oid_t *oid, char *repo) {
     return fd;
 }
 
+/// @brief Main function handling the logic behind hash-object
+/// @param oid Output. Pointer to a `oid_t` struct that will containt the object SHA1 HASH.
+/// @param fd File descriptor to the file file converted to blob.
+/// @param stat_buf `stat` struct for the file, obtained from stat()
+/// @param repo Path to the .notso_git folder
+/// @param write_arg bool for the -w argument
+/// @return -1 on error
 int hash_file(oid_t *oid, int fd, struct stat *stat_buf, char *repo, int write_arg) {
     int oid_fd; // fd of the blob
     buf_t oid_content;
@@ -130,7 +147,6 @@ int hash_file(oid_t *oid, int fd, struct stat *stat_buf, char *repo, int write_a
         return 0;
     }
 
-    // TODO: Create a write_all function
     // ssize_t n = write_all(oid_fd, compressed.data, compressed.len);
     int n = write(oid_fd, compressed.data, compressed.len);
     if (n < 0 || (size_t)n != compressed.len) {

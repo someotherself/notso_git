@@ -55,6 +55,7 @@ obj_type_t obj_t_from_str(const char *str);
 obj_type_t obj_t_from_mode(const char *mode);
 char* mode_to_str(const char *mode);
 
+/// @brief A multipurpose dynamic array. Holds bytes (unsigned char). Use helpers `buf_init` and `free_buf`
 typedef struct {
     unsigned char *data;
     size_t len;

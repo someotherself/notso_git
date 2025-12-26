@@ -23,6 +23,9 @@ void free_buf(buf_t *b) {
     free(b->data);
 }
 
+/// @brief Reserves capacity in the array. Does not update the length field.
+/// @param b Pointer to a buf_t byte array
+/// @param s Total capacity needed.
 void buf_reserve(buf_t *b, size_t s) {
     if (b->cap < s) {
         size_t new_cap = s;
@@ -32,6 +35,11 @@ void buf_reserve(buf_t *b, size_t s) {
     }
 }
 
+/// @brief Adds bytes to the array. Will update the length field.
+/// @param b Pointer to a buf_t byte array
+/// @param data Data to be added to the array.
+/// @param s Size of the data
+/// @return -1 on error
 int buf_append(buf_t *b, const void *data, size_t s) {
     // Check if we have enough capacity
     if (b->len + s > b->cap) {
@@ -49,6 +57,10 @@ int buf_append(buf_t *b, const void *data, size_t s) {
     return 0;
 }
 
+/// @brief Adds extra capacity to the array. Does not update the length field.
+/// @param b Pointer to a buf_t byte array
+/// @param extra Capacity needed, added in adition to the existing capacity.
+/// @return -1 on error
 int buf_grow(buf_t *b, size_t extra) {
     size_t needed = b->len + extra;
     if (b->cap >= needed) return 0; // We have enough cap
@@ -77,6 +89,8 @@ void oid_to_hex(const unsigned char oid[20], char hex[41]) {
     hex[40] = '\0';
 }
 
+/// @brief Helper to print SHA1 hash
+/// @param oid Pointer to a oid_t struct
 void print_hex(oid_t *oid) {
     for (int i = 0; i < SHA_DIGEST_LENGTH; i++) {
         printf("%02x", (unsigned)oid->hash[i]);
@@ -88,31 +102,39 @@ void print_hex(oid_t *oid) {
 // Path helpers
 // ----------------------------
 
-/* writes 2 hex chars + '\0' */
+/// @brief Helper to create the folder for a git object. Writes 2 hex chars + '\0'
+/// @param oid Pointer to a oid_t struct
+/// @param out Output containing the directory name + null terminator.
 void oid_dir(const oid_t *oid, char out[3]) {
     snprintf(out, 3, "%02x", oid->hash[0]);
 }
 
-/* writes 38 hex chars + '\0' */
+/// @brief Helper to create the file for a git object. Writes 38 hex chars + '\0'
+/// @param oid Pointer to a oid_t struct
+/// @param out Output containing the file name + null terminator.
 void oid_file(const oid_t *oid, char out[39]) {
     for (int i = 1; i < SHA_DIGEST_LENGTH; i++) {
         sprintf(out + (i - 1) * 2, "%02x", oid->hash[i]);
     }
 }
 
-/* writes 2 string chars + '\0' */
+/// @brief Helper to create the folder for a git object. Writes 2 STRING chars + '\0'
+/// @param oid Pointer to a oid_t struct
+/// @param out Output containing the directory name + null terminator.
 void oid_dir_str(const char *oid_hex, char out[3]) {
     memcpy(out, oid_hex, 2);
     out[2] = '\0';
 }
 
-/* writes 38 string chars + '\0' */
+/// @brief Helper to create the file for a git object. Writes 38 STRING chars + '\0'
+/// @param oid Pointer to a oid_t struct
+/// @param out Output containing the file name + null terminator.
 void oid_file_str(const char *oid_hex, char out[39]) {
     memcpy(out, oid_hex + 2, 38);
     out[38] = '\0';
 }
 
-// Concatenates 2 path components 
+// Concatenates 2 path components
 int concat_path(char *out, size_t out_size, const char* p1, const char* p2) {
     int n = snprintf(out, out_size, "%s/%s", p1, p2);
     return (n >= 0 && (size_t)n < out_size) ? 0 : -1;
@@ -122,6 +144,7 @@ int concat_path(char *out, size_t out_size, const char* p1, const char* p2) {
 // Object Header
 // ----------------------------
 
+/// @brief Helper to convert a string to an object type
 const struct str_to_obj_t head_conversion[] = {
     {OBJ_BLOB, "blob"},
     {OBJ_TREE, "tree"},
@@ -129,6 +152,7 @@ const struct str_to_obj_t head_conversion[] = {
     {OBJ_UNKNOWN, ""},
 };
 
+/// @brief Helper to convert a string to an object type
 obj_type_t obj_t_from_str(const char *str) {
     int i;
     for (i = 0; i < (int)(sizeof(head_conversion) / sizeof(head_conversion[0])); i++) {
@@ -139,6 +163,7 @@ obj_type_t obj_t_from_str(const char *str) {
     return OBJ_UNKNOWN;
 }
 
+/// @brief Helper to convert a mode to an object type
 const struct mode_to_obj_t mode_conversion[] = {
     {OBJ_BLOB, "100644"},
     {OBJ_TREE, "40000"},
@@ -146,6 +171,7 @@ const struct mode_to_obj_t mode_conversion[] = {
     {OBJ_UNKNOWN, ""},
 };
 
+/// @brief Helper to convert a mode to an object type
 obj_type_t obj_t_from_mode(const char *mode) {
     int i;
     for (i = 0; i< (int)(sizeof(mode_conversion) / sizeof(mode_conversion[0])); i++) {
@@ -156,6 +182,7 @@ obj_type_t obj_t_from_mode(const char *mode) {
     return OBJ_UNKNOWN;
 }
 
+/// @brief Helper to convert a mode to an object name as string
 const struct mode_to_str mode_str_conversion[] = {
     {"blob", "100644"},
     {"blob", "120000"},
@@ -164,6 +191,7 @@ const struct mode_to_str mode_str_conversion[] = {
     {"commit", "160000"},
 };
 
+/// @brief Helper to convert a mode to an object name as string
 char* mode_to_str(const char *mode) {
     for (size_t i = 0; i < (sizeof(mode_str_conversion) / sizeof(mode_str_conversion[0])); i++) {
         if (strcmp(mode, mode_str_conversion[i].mode) == 0) {
@@ -244,7 +272,6 @@ int read_object(buf_t *object_contents, char object_folder[], const char* oid_na
         return -1;
     }
 
-    // TODO: Create a read_all function
     int b_read;
     if ((b_read = read(obj_fd, object_contents->data, object_contents->cap)) < 0) {
         fprintf(stderr, "Failed to read object to blob (%s)\n", strerror(errno));
@@ -257,6 +284,10 @@ int read_object(buf_t *object_contents, char object_folder[], const char* oid_na
     return 0;
 }
 
+/// @brief Decompresses a git object using zlib
+/// @param src A pointer to a buf_t array containing the compressed object
+/// @param dst A pointer to a buf_t array where the object will be decompressed.
+/// @return -1 on error.
 int decompress_object(buf_t *src, buf_t *dst) {
     z_stream strm = {0};
 
@@ -291,6 +322,10 @@ int decompress_object(buf_t *src, buf_t *dst) {
     return 0;
 }
 
+/// @brief Used by cat-file to read the contents of a git object.
+/// @param src Pointer to a `buf_t` array, containing the decompressed contents of the object.
+/// @param header Pointer to a `header_t` struct containing the object header
+/// @return -1 on error
 int read_contents(buf_t *src, header_t *header) {
     unsigned char *nul = memchr(src->data, '\0', src->len);
     if (nul == NULL) return -1;
