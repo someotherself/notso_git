@@ -34,7 +34,6 @@ void init_index_state(index_state_t *index);
 void free_index_state(index_state_t *index);
 void free_entry(index_entry_t *entry);
 int write_index_to_file(char *path, index_state_t *index);
-int cmp_path_key_to_entry(const void *key, const void *elem);
 int ls_files();
 
 #endif

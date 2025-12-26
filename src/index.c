@@ -11,6 +11,7 @@
 #include <arpa/inet.h>
 #include <openssl/sha.h>
 
+#include "init.h"
 #include "add.h"
 #include "index.h"
 #include "objects.h"
@@ -100,8 +101,8 @@ int write_index_header(int fd, index_state_t *index) {
     uint32_t version_be = htonl(index->version);
     uint32_t count_be = htonl(index->entries_count);
 
-    memcpy(head + 4, &version_be, 4);
-    memcpy(head + 8, &count_be, 4);
+    memcpy(head + 4, &version_be, sizeof(uint32_t));
+    memcpy(head + 8, &count_be, sizeof(uint32_t));
 
     return write_all(fd, head, 12);
 }
@@ -121,7 +122,7 @@ int sha_checksum(int fd, char *tmp_path) {
     fdatasync(fd);
     if (lseek(fd, 0, SEEK_SET) < 0) return -1;
     int b_read = 0;
-    if ((b_read = read_all(fd, buf, size)) < 0) {
+    if ((b_read = read_all(fd, buf, size)) < 0 || b_read == 0) {
         return -1;
     }
     if (lseek(fd, 0, SEEK_END) < 0) return -1;
@@ -159,10 +160,10 @@ int write_index_to_file(char *path, index_state_t *index) {
             close(temp_fd);
             return -1;
         }
-        if (sha_checksum(temp_fd, tmp) < 0) {
-            close(temp_fd);
-            return -1;
-        }
+    }
+    if (sha_checksum(temp_fd, tmp) < 0) {
+        close(temp_fd);
+        return -1;
     }
 
     char index_path[MAX_PATH];
@@ -175,17 +176,24 @@ int write_index_to_file(char *path, index_state_t *index) {
 // Will check if the entry (path) already exists in the index, and if the HASH is the same
 // Sorts the entries again after inserting a new entry
 int append_entry(index_state_t *index, index_entry_t *entry) {
-    index_entry_t *ret = bsearch(entry->path, index->entries,
-                            index->entries_count, sizeof index->entries[0], cmp_path_key_to_entry);
-    if (ret != NULL) {
-        if (memcmp(ret->oid.hash, entry->oid.hash, SHA_DIGEST_LENGTH) != 0) {
-            /// replace existing entry
-            free(ret->path);
-            *ret = *entry;
-            entry->path = NULL;
-            return 0;
-        } else {
-            return 0;
+    if (entry == NULL || index == NULL) {
+        return -1;
+    }
+    if (index->entries_count > 0) {
+        index_entry_t *ret = bsearch(entry->path, index->entries,
+                                index->entries_count, sizeof index->entries[0], cmp_path_key_to_entry);
+        if (ret != NULL) {
+            if (memcmp(ret->oid.hash, entry->oid.hash, SHA_DIGEST_LENGTH) != 0) {
+                /// replace existing entry
+                free(ret->path);
+                *ret = *entry;
+                entry->path = NULL;
+                return 0;
+            } else {
+                free(entry->path);
+                entry->path = NULL;
+                return 0;
+            }
         }
     }
 
@@ -193,7 +201,7 @@ int append_entry(index_state_t *index, index_entry_t *entry) {
 
     index_entry_t *new_entries = realloc(index->entries, 
                                     (size_t)new_count * sizeof(index_entry_t));
- 
+
     if (new_entries == NULL) {
         return -1;
     }
@@ -258,7 +266,9 @@ int create_entry(char *path, struct stat *stat_buf, index_state_t *index) {
     hash_object(&oid, 1, path);
     idx_e.oid = oid;
 
-    append_entry(index, &idx_e);
+    if (append_entry(index, &idx_e) < -1) {
+        return -1;
+    };
     return 0;
 }
 
@@ -289,15 +299,21 @@ int read_index_target(char *path, index_state_t *index) {
                 return -1;
             }
             if (S_ISDIR(stat_buf.st_mode)) {
-                read_index_target(full, index);
+                if (read_index_target(full, index) < 0) {
+                    return -1;
+                }
             } else {
-                create_entry(full, &st, index);
+                if (create_entry(full, &st, index) < 0) {
+                    return -1;
+                };
                 return 0;
             }
         }
         closedir(dir);
     } else {
-        create_entry(path, &stat_buf, index);
+        if (create_entry(path, &stat_buf, index) < 0) {
+            return -1;
+        };
         return 0;
     }
     return 0;
@@ -328,7 +344,7 @@ int read_entries(buf_t *index, index_state_t *out, int entry_count) {
             fprintf(stderr, "Path data exceeds buffer\n");
             return -1;
         }
-        char *p = malloc(name_len);
+        char *p = malloc(name_len + 1);
         memcpy(p, index->data + n, name_len);
         p[name_len] = '\0';
         idx_entry.path = p;
@@ -336,7 +352,9 @@ int read_entries(buf_t *index, index_state_t *out, int entry_count) {
 
         while (index->data[n] == '\0') n++;
 
-        append_entry(out, &idx_entry);
+        if (append_entry(out, &idx_entry) < 0) {
+            return -1;
+        };
     }
     return 0;
 }
@@ -359,7 +377,37 @@ int parse_index_header(buf_t *data) {
     return (int)read_be32(data->data + 8);
 }
 
-int ls_files() {
+void read_index(index_state_t *index) {
+    printf("read index index->entries_count: %d\n", index->entries_count);
+    if (index->entries_count == 0) {
+        return;
+    };
+    for (uint32_t i = 0; i < index->entries_count; i++) {
+        printf("%s\n", index->entries[i].path);
+    }
+    return;
+}
 
+int ls_files() {
+    char base[BUFSIZ] = { 0 };
+    if (find_base(base, sizeof(base)) == -1) {
+        fprintf(stderr, "Could not find repo (%s)\n", strerror(errno));
+        return -1;
+    }
+
+    index_state_t index;
+    buf_t idx_contents;
+    buf_init(&idx_contents);
+
+    if (init_index(base, &index, &idx_contents) < 0) {
+        free_index_state(&index);
+        free_buf(&idx_contents);
+        return -1;
+    }
+
+    read_index(&index);
+
+    free_index_state(&index);
+    free_buf(&idx_contents);
     return 0;
 }
