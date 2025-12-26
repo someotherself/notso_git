@@ -37,6 +37,8 @@ void usage(usage_t u) {
         case USAGE_GEN:
             fprintf(stderr,
                 "usage: ./notsogit <command> [<args>]\n");
+            fprintf(stderr,
+                "Commands: init, add, hash-object, cat-file, ls-tree\n");
             break;
         case USAGE_INIT:
             fprintf(stderr,
@@ -61,7 +63,7 @@ void usage(usage_t u) {
         case USAGE_LS_TREE:
             fprintf(stderr,
                 "usage: ./notsogit ls-tree <tree>\n"
-                "List the contents of a tree object.\n");
+                "List the contents of a tree object (writing trees not implemented).\n");
             break;
         case USAGE_WRITE_TREE:
             fprintf(stderr,
@@ -74,7 +76,7 @@ void usage(usage_t u) {
                 "Show information about the files in the staging area.\n");
             break;
         case USAGE_INVALID:
-            fprintf(stderr, "Not a valid command\n");
+            fprintf(stderr, "Not a valid command. Use --help for a list of commands.\n");
             break;
         default:
             break;
@@ -83,6 +85,11 @@ void usage(usage_t u) {
 
 int run(int argc, char **argv) {
     if (argc < 2) {
+        usage(USAGE_GEN);
+        return 1;
+    }
+
+    if (strcmp(argv[1], "--help") == 0) {
         usage(USAGE_GEN);
         return 1;
     }
@@ -98,6 +105,10 @@ int run(int argc, char **argv) {
 
     if (strcmp(argv[1], "add") == 0) {
         if (argc != 3) {
+            usage(USAGE_ADD);
+            return 1;
+        }
+        if (strcmp(argv[2], "--help") == 0) {
             usage(USAGE_ADD);
             return 1;
         }
@@ -123,6 +134,10 @@ int run(int argc, char **argv) {
         oid_t oid = { 0 };
 
         if (argc == 3) {
+            if (strcmp(argv[2], "--help") == 0) {
+                usage(USAGE_HASH_OBJECT);
+                return 1;
+            }
             if (strlen(argv[2]) >= sizeof(file_path)) {
                 fprintf(stderr, "Input is too long\n");
                 return -1;
@@ -134,6 +149,10 @@ int run(int argc, char **argv) {
         }
 
         if (strcmp(argv[2], "-w") == 0) {
+            if (strcmp(argv[3], "--help") == 0) {
+                usage(USAGE_HASH_OBJECT);
+                return 1;
+            }
             write = 1; /* Write the hashed object to file */
             if (strlen(argv[3]) >= sizeof(file_path)) {
                 fprintf(stderr, "Input is too long\n");
@@ -155,8 +174,7 @@ int run(int argc, char **argv) {
     if (strcmp(argv[1], "cat-file") == 0) {
         int pretty = 0;
         char oid_name[4096];
-
-        if (argc < 3 || argc > 4) {
+        if (argc < 3 || argc > 4 || strcmp(argv[2], "--help") == 0) {
             usage(USAGE_CAT_FILE);
             return 1;
         }
@@ -173,6 +191,10 @@ int run(int argc, char **argv) {
         }
 
         if (strcmp(argv[2], "-p") == 0) {
+            if (strcmp(argv[3], "--help") == 0) {
+                usage(USAGE_CAT_FILE);
+                return 1;
+            }
             pretty = 1;
             if (strlen(argv[3]) > 40) {
                 fprintf(stderr, "Invalid input\n");
@@ -195,14 +217,14 @@ int run(int argc, char **argv) {
             usage(USAGE_WRITE_TREE);
             return 1;
         }
-        write_tree();
+        printf("Not implemented\n");
+        // write_tree();
         return 0;
     }
 
     if (strcmp(argv[1], "ls-tree") == 0) {
         char oid_name[4096];
-
-        if (argc != 3) {
+        if (argc != 3 || strcmp(argv[2], "--help") == 0) {
             usage(USAGE_LS_TREE);
             return 1;
         }
@@ -216,6 +238,10 @@ int run(int argc, char **argv) {
     }
 
     if (strcmp(argv[1], "ls-files") == 0) {
+        if (strcmp(argv[2], "--help") == 0) {
+            usage(USAGE_LS_FILES);
+            return 1;
+        }
         if (argc > 2) {
             usage(USAGE_LS_FILES);
             return 1;
