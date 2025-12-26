@@ -238,7 +238,7 @@ int run(int argc, char **argv) {
     }
 
     if (strcmp(argv[1], "ls-files") == 0) {
-        if (strcmp(argv[2], "--help") == 0) {
+        if (argc == 3 && strcmp(argv[2], "--help") == 0) {
             usage(USAGE_LS_FILES);
             return 1;
         }
