@@ -10,7 +10,7 @@
 #include "init.h"
 #include "objects.h"
 
-int create_blob(Oid *oid, int fd, buf_t *obj, size_t size) {
+int create_blob(oid_t *oid, int fd, buf_t *obj, size_t size) {
     char header[64];
 
     int header_len = snprintf(header, sizeof(header), "blob %zu", size) + 1;
@@ -40,7 +40,7 @@ int create_blob(Oid *oid, int fd, buf_t *obj, size_t size) {
     return 0;
 }
 
-int create_target(Oid *oid, char *repo) {
+int create_target(oid_t *oid, char *repo) {
     int fd;
 
     char o_path[BUFSIZ];
@@ -80,7 +80,7 @@ int create_target(Oid *oid, char *repo) {
     return fd;
 }
 
-int hash_file(Oid *oid, int fd, struct stat *stat_buf, char *repo, int write_arg) {
+int hash_file(oid_t *oid, int fd, struct stat *stat_buf, char *repo, int write_arg) {
     int oid_fd; // fd of the blob
     buf_t oid_content;
     buf_init(&oid_content);
@@ -148,7 +148,7 @@ int hash_file(Oid *oid, int fd, struct stat *stat_buf, char *repo, int write_arg
     return 0;
 }
 
-int hash_object(int write, char *file) {
+int hash_object(oid_t *oid, int write, char *file) {
     char base[BUFSIZ] = { 0 };
     if (find_base(base, sizeof(base)) == -1) {
         fprintf(stderr, "Could not find repo (%s)\n", strerror(errno));
@@ -156,7 +156,6 @@ int hash_object(int write, char *file) {
     }
 
     int fd; // Blob will be saved here
-    Oid oid = { 0 }; // Holds the blob hash
 
     if ((fd = open(file, O_RDONLY)) < 0) {
         fprintf(stderr, "Could not open source file %s (%s)\n", file, strerror(errno));
@@ -170,16 +169,11 @@ int hash_object(int write, char *file) {
         return -1;
     }
 
-    if (hash_file(&oid, fd, &stat_buf, base, write) < 0) {
+    if (hash_file(oid, fd, &stat_buf, base, write) < 0) {
         fprintf(stderr, "Could not hash file %s (%s)\n", file, strerror(errno));
         close(fd);
         return -1;
     }
-
-    for (int i = 0; i < 20; i++) {
-        printf("%02x", oid.hash[i]);
-    }
-    printf("\n");
 
     close(fd);
     return 0;

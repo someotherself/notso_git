@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <zlib.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <fcntl.h>
 
 #include "objects.h"
@@ -76,17 +77,24 @@ void oid_to_hex(const unsigned char oid[20], char hex[41]) {
     hex[40] = '\0';
 }
 
+void print_hex(oid_t *oid) {
+    for (int i = 0; i < SHA_DIGEST_LENGTH; i++) {
+        printf("%02x", (unsigned)oid->hash[i]);
+    }
+    putchar('\n');
+}
+
 // ----------------------------
 // Path helpers
 // ----------------------------
 
 /* writes 2 hex chars + '\0' */
-void oid_dir(const Oid *oid, char out[3]) {
+void oid_dir(const oid_t *oid, char out[3]) {
     snprintf(out, 3, "%02x", oid->hash[0]);
 }
 
 /* writes 38 hex chars + '\0' */
-void oid_file(const Oid *oid, char out[39]) {
+void oid_file(const oid_t *oid, char out[39]) {
     for (int i = 1; i < SHA_DIGEST_LENGTH; i++) {
         sprintf(out + (i - 1) * 2, "%02x", oid->hash[i]);
     }
@@ -311,7 +319,7 @@ int read_contents(buf_t *src, header_t *header) {
 // fs functions
 // ----------------------------
 
-int read_all(const int fd, unsigned char *buf, size_t size) {
+ssize_t read_all(const int fd, unsigned char *buf, size_t size) {
     size_t b_read = 0;
     for (;;) {
         ssize_t n = read(fd, buf + b_read, size - b_read);
@@ -325,7 +333,7 @@ int read_all(const int fd, unsigned char *buf, size_t size) {
     return b_read;
 }
 
-int write_all(const int fd, unsigned char *buf, size_t size) {
+ssize_t write_all(const int fd, unsigned char *buf, size_t size) {
     size_t b_written = 0;
     while (b_written < size) {
         ssize_t n = write(fd, buf + b_written, size - b_written);

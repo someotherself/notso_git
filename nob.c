@@ -23,6 +23,7 @@ int main(int argc, char **argv) {
         SRC_FOLDER"ls-tree.c",
         SRC_FOLDER"write-tree.c",
         SRC_FOLDER"add.c",
+        SRC_FOLDER"index.c",
         "-lcrypto", "-lz"
     );
 

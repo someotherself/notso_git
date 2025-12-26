@@ -27,6 +27,7 @@ typedef enum {
     USAGE_CAT_FILE,
     USAGE_LS_TREE,
     USAGE_WRITE_TREE,
+    USAGE_LS_FILES,
     // Command not recognized
     USAGE_INVALID,
 } usage_t;
@@ -66,6 +67,11 @@ void usage(usage_t u) {
             fprintf(stderr,
                 "usage: ./notsogit write-tree\n"
                 "Create a tree object from the staging area.\n");
+            break;
+        case USAGE_LS_FILES:
+            fprintf(stderr,
+                "usage: ./notsogit ls-files\n"
+                "Show information about the files in the staging area.\n");
             break;
         case USAGE_INVALID:
             fprintf(stderr, "Not a valid command\n");
@@ -114,13 +120,16 @@ int run(int argc, char **argv) {
             return 1;
         }
 
+        oid_t oid = { 0 };
+
         if (argc == 3) {
             if (strlen(argv[2]) >= sizeof(file_path)) {
                 fprintf(stderr, "Input is too long\n");
                 return -1;
             }
             strncpy(file_path, argv[2], sizeof(file_path) - 1);
-            hash_object(write, file_path);
+            hash_object(&oid, write, file_path);
+            print_hex(&oid);
             return 0;
         }
 
@@ -131,7 +140,8 @@ int run(int argc, char **argv) {
                 return -1;
             }
             strncpy(file_path, argv[3], sizeof(file_path) - 1);
-            hash_object(write, file_path);
+            hash_object(&oid, write, file_path);
+            print_hex(&oid);
             return 0;
         }
 
@@ -205,6 +215,14 @@ int run(int argc, char **argv) {
         return 0;
     }
 
+    if (strcmp(argv[1], "ls-files") == 0) {
+        if (argc > 2) {
+            usage(USAGE_LS_FILES);
+            return 1;
+        }
+        ls_files();
+        return 0;
+    }
 
     usage(USAGE_INVALID);
     return 0;

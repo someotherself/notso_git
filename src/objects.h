@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <openssl/sha.h>
+#include <sys/types.h>
 
 #define HASH_HEX_LEN 40
 #define MAX_PATH     4096
@@ -13,10 +14,11 @@
 
 typedef struct {
     unsigned char hash[SHA_DIGEST_LENGTH];
-} Oid;
+} oid_t;
 
-void oid_dir(const Oid *oid, char out[3]);
-void oid_file(const Oid *oid, char out[39]);
+void print_hex(oid_t *oid);
+void oid_dir(const oid_t *oid, char out[3]);
+void oid_file(const oid_t *oid, char out[39]);
 void oid_dir_str(const char *oid_hex, char out[3]);
 void oid_file_str(const char *oid_hex, char out[39]);
 
@@ -78,7 +80,7 @@ int decompress_object(buf_t *src, buf_t *dst);
 int read_object(buf_t *object_contents, char object_name[], const char* oid_name);
 void oid_to_hex(const unsigned char oid[20], char hex[41]);
 
-int read_all(const int fd, unsigned char *buf, size_t size);
-int write_all(const int fd, unsigned char *buf, size_t size);
+ssize_t read_all(const int fd, unsigned char *buf, size_t size);
+ssize_t write_all(const int fd, unsigned char *buf, size_t size);
 
 #endif

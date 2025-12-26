@@ -2,8 +2,6 @@
 
 set -eu
 
-# >&2 -> redirect to stderr
-# &* -> positional character. Takes all the cli args as one string
 fail() { echo "FAIL t0003-add.sh: $*" >&2; exit 1; }
 pass() { echo "PASS t0003-add.sh"; }
 
@@ -17,28 +15,29 @@ VALGRIND="valgrind --quiet --tool=memcheck --leak-check=full --show-leak-kinds=a
   --errors-for-leak-kinds=definite,indirect,possible \
   --error-exitcode=99"
 
-# There is no global working directory, or env var for the repo. Always use absolute paths.
 BIN="$(pwd)/build/notsogit"
 
 cd "$T"
 
-# Create a file to test with
-#FILE="$T/file.txt"
-#printf "hello hello hello hello hello hello hello hello hello \n" > "$FILE"
+FILE="$T/file.txt"
+printf "hello hello hello hello hello hello hello hello hello \n" > "$FILE"
 
-# Create a base repo in the tmp folder
 "$BIN" init >/dev/null || fail "init failed"
 
-# For now, a mock input
-FILE="file"
+$VALGRIND "$BIN" add file.txt
 
-OUT="$T/out.txt"
-$VALGRIND "$BIN" add "$FILE" >"$OUT"
+git init >/dev/null || fail "init failed"
+git add "$FILE"
 
-EXPECTED="$T/expected.txt"
-echo "Received path: file" > "$EXPECTED"
-if ! cmp -s "$OUT" "$EXPECTED"; then
-    fail "Output does not match: "$OUT""
-fi
+INDEX="$T/.notso_git/index"
+EXPECTED="$T/.git/index"
+
+first_diff() {
+  cmp -l "$1" "$2" | awk 'NR==1{printf "offset=%d (0x%x) a=%02x b=%02x\n", $1-1, $1-1, $2, $3}'
+}
+
+first_diff "$INDEX" "$EXPECTED" || echo "files identical"
+
+cmp -s "$INDEX" "$EXPECTED" || fail "Output does not match."
 
 pass
