@@ -12,7 +12,7 @@ int main(int argc, char **argv) {
 
     nob_cmd_append(&cmd,
         "gcc",
-        "-Wall", "-Wextra", "-pedantic", "-std=c11", "-ggdb",
+        "-Wall", "-Wextra", "-Wvla", "-pedantic", "-std=c11", "-ggdb",
         "-Wno-deprecated-declarations",
         "-o", BUILD_FOLDER"notsogit",
         SRC_FOLDER"main.c",

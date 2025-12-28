@@ -7,7 +7,7 @@
 /// @param contents Raw, decompressed contents of the tree object.
 /// @param content_len Contents length from the object header.
 /// @return -1 on error
-int read_tree(char *contents, size_t content_len) {
+int read_tree(unsigned char *contents, size_t content_len) {
     const unsigned char *cursor = (unsigned char*)contents; // cursor needs to track bytes
     const unsigned char *end = cursor + content_len;
 
@@ -22,8 +22,10 @@ int read_tree(char *contents, size_t content_len) {
         if (mode_len > 16) {
             return -1;
         }
-        char mode[16] = { 0 };
+        // TODO: Null terminate it
+        char mode[17];
         memcpy(mode, cursor, mode_len);
+        mode[mode_len] = '\0';
         char *mode_str = mode_to_str(mode);
         cursor += mode_len + 1;
 

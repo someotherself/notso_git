@@ -76,39 +76,32 @@ int setup_base_dir(char *root) {
         fprintf(stderr, "Path to repo too long\n");
         return -1;
     };
-    struct stat statbuf = {0};
-    if (stat(base, &statbuf) < 0) {
-        if (mkdir(base, 0755) < 0) {
-            fprintf(stderr, "Could not create .notso_git folder (%s)\n", strerror(errno));
-            return -1;
-        };
+
+    if (mkdir(base, 0755) < 0 && errno != EEXIST) {
+        fprintf(stderr, "Could not create .notso_git folder (%s)\n", strerror(errno));
+        return -1;
     }
+
     // HEAD
     snprintf(temp, sizeof(temp), "%s%s", base, "/HEAD");
-    if (stat(temp, &statbuf) < 0) {
-        head_fd = open(temp, O_WRONLY | O_APPEND | O_CREAT, 0644) ;
-        if (head_fd < 0) {
-            fprintf(stderr, "Could not create HEAD (%s)\n", strerror(errno));
-            return -1;
-        };
-        close(head_fd);
-    }
+    head_fd = open(temp, O_WRONLY | O_CREAT | O_EXCL, 0644) ;
+    if (head_fd < 0) {
+        fprintf(stderr, "Could not create HEAD (%s)\n", strerror(errno));
+        return -1;
+    };
+    close(head_fd);
     // objects/
     snprintf(temp, sizeof(temp), "%s%s", base, "/objects");
-    if (stat(temp, &statbuf) < 0) {
-        if (mkdir(temp, 0755) < 0) {
-            fprintf(stderr, "Could not objects folder (%s)\n", strerror(errno));
-            return -1;
-        };
+    if (mkdir(temp, 0755) < 0 && errno != EEXIST) {
+        fprintf(stderr, "Could not objects folder (%s)\n", strerror(errno));
+        return -1;
     }
-// refs/
+    // refs/
     snprintf(temp, sizeof(temp), "%s%s", base, "/refs");
-    if (stat(temp, &statbuf) < 0) {
-        if (mkdir(temp, 0755) < 0) {
-            fprintf(stderr, "Could not create refs folder (%s)\n", strerror(errno));
-            return -1;
-        };
-    }
+    if (mkdir(temp, 0755) < 0 && errno != EEXIST) {
+        fprintf(stderr, "Could not create refs folder (%s)\n", strerror(errno));
+        return -1;
+    };
     return 0;
 }
 

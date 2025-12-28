@@ -56,7 +56,7 @@ uint16_t read_be16_seek(const unsigned char *p, size_t *n) {
            ((uint16_t)a[1] << 0);
 }
 
-// Converts to big endian and writes a single uint32_t  to the byte array and advances the cursor the the size of teh uint32_t
+// Converts to big endian and writes a single uint32_t to the byte array and advances the cursor the the size of teh uint32_t
 void cpy_uint32_seek(unsigned char *buf, uint32_t value, size_t *off) {
     uint32_t bytes = htonl(value);
     memcpy(buf + *off, &bytes, sizeof(uint32_t));
@@ -107,7 +107,7 @@ int write_index_entry(int fd, index_entry_t *entry) {
 /// @brief Writes the index header to the temprary file
 /// @param fd File descriptor to the temporary file.
 /// @param index In memory index state
-/// @return Does not return errors. TODO
+/// @return -1 on any write errors to the fd
 int write_index_header(int fd, index_state_t *index) {
     unsigned char head[12];
     memcpy(head, "DIRC", 4);
@@ -134,20 +134,43 @@ int sha_checksum(int fd, char *tmp_path) {
         return -1;
     }
 
-    int size = stat_buf.st_size;
-    unsigned char buf[size];
-
-    fdatasync(fd);
-    if (lseek(fd, 0, SEEK_SET) < 0) return -1;
-    int b_read = 0;
-    if ((b_read = read_all(fd, buf, size)) < 0 || b_read == 0) {
+    size_t size = stat_buf.st_size;
+    if (size == 0) {
+        // Something went wrong creating the index
         return -1;
     }
-    if (lseek(fd, 0, SEEK_END) < 0) return -1;
+    // Store the file contents temporarily
+    buf_t temp = { 0 };
+    buf_init(&temp);
+    buf_reserve(&temp, size);
 
-    SHA1_Update(&ctx, buf, size);
+    fdatasync(fd);
+    if (lseek(fd, 0, SEEK_SET) < 0) {
+        free_buf(&temp);
+        return -1;
+    };
+    int b_read = 0;
+    if ((b_read = read_all(fd, temp.data, size)) < 0 || (size_t)b_read != size) {
+        free_buf(&temp);
+        return -1;
+    }
+    temp.len += b_read;
+
+    if (lseek(fd, 0, SEEK_END) < 0) {
+        free_buf(&temp);
+        return -1;
+    };
+
+    if (SHA1_Update(&ctx, temp.data, temp.len) < 0) {
+        free_buf(&temp);
+        return -1;
+    }
+    free_buf(&temp);
+
     oid_t oid = { 0 };
-    SHA1_Final(oid.hash, &ctx);
+    if (SHA1_Final(oid.hash, &ctx) < 0) {
+        return -1;
+    };
     if (write_all(fd, oid.hash, 20) < 0) {
         return -1;
     }
@@ -164,22 +187,24 @@ int write_index_to_file(char *path, index_state_t *index) {
     concat_path(tmp, MAX_PATH, path, "tmp_XXXXXX");
     int temp_fd = mkstemp(tmp);
     if (temp_fd < 0) {
-        close(temp_fd);
         return -1;
     }
 
     if (write_index_header(temp_fd, index) < 0) {
+        unlink(tmp);
         close(temp_fd);
         return -1;
     }
 
     for (uint32_t i = 0; i < index->entries_count; i++) {
         if (write_index_entry(temp_fd, &index->entries[i]) < 0) {
+            unlink(tmp);
             close(temp_fd);
             return -1;
         }
     }
     if (sha_checksum(temp_fd, tmp) < 0) {
+        unlink(tmp);
         close(temp_fd);
         return -1;
     }
@@ -217,7 +242,7 @@ int append_entry(index_state_t *index, index_entry_t *entry) {
         }
     }
 
-    u_int32_t new_count = index->entries_count + 1;
+    uint32_t new_count = index->entries_count + 1;
 
     index_entry_t *new_entries = realloc(index->entries, 
                                     (size_t)new_count * sizeof(index_entry_t));
@@ -269,17 +294,17 @@ void free_entry(index_entry_t *entry) {
 int create_entry(char *path, struct stat *stat_buf, index_state_t *index) {
     index_entry_t idx_e = { 0 };
 
-    idx_e.ctime = (u_int32_t)stat_buf->st_ctim.tv_sec;
-    idx_e.ctime_nanos = (u_int32_t)stat_buf->st_ctim.tv_nsec;
-    idx_e.mtime = (u_int32_t)stat_buf->st_mtim.tv_sec;
-    idx_e.mtime_nanos = (u_int32_t)stat_buf->st_mtim.tv_nsec;
-    idx_e.dev = (u_int32_t)stat_buf->st_dev;
-    idx_e.ino = (u_int32_t)stat_buf->st_ino;
+    idx_e.ctime = (uint32_t)stat_buf->st_ctim.tv_sec;
+    idx_e.ctime_nanos = (uint32_t)stat_buf->st_ctim.tv_nsec;
+    idx_e.mtime = (uint32_t)stat_buf->st_mtim.tv_sec;
+    idx_e.mtime_nanos = (uint32_t)stat_buf->st_mtim.tv_nsec;
+    idx_e.dev = (uint32_t)stat_buf->st_dev;
+    idx_e.ino = (uint32_t)stat_buf->st_ino;
     idx_e.mode = stat_buf->st_mode;
     idx_e.uid =  stat_buf->st_uid;
     idx_e.gid = stat_buf->st_gid;
     idx_e.file_size = stat_buf->st_size;
-    u_int16_t name_len = strlen(path);
+    uint16_t name_len = strlen(path);
     uint16_t n = (name_len >= 0x0FFF) ? 0x0FFF : (uint16_t)name_len;
     idx_e.flags = n;
 
@@ -305,14 +330,12 @@ int create_entry(char *path, struct stat *stat_buf, index_state_t *index) {
 int read_index_target(char *path, index_state_t *index) {
     struct stat stat_buf;
     if (stat(path, &stat_buf) < 0) {
-        errno = ENOENT;
         return -1;
     }
 
     if (S_ISDIR(stat_buf.st_mode)) {
         DIR *dir = opendir(path);
         if (dir == NULL) {
-            errno = ENOENT;
             return -1;
         };
         struct dirent *dr;
@@ -325,7 +348,6 @@ int read_index_target(char *path, index_state_t *index) {
             concat_path(full, sizeof(full), path, dr->d_name);
             struct stat st;
             if (stat(full, &st) < 0) {
-                errno = ENOENT;
                 return -1;
             }
             if (S_ISDIR(stat_buf.st_mode)) {
@@ -373,7 +395,7 @@ int read_entries(buf_t *index, index_state_t *out, int entry_count) {
         n += 20;
 
         idx_entry.flags = read_be16_seek(index->data, &n);
-        u_int16_t name_len = idx_entry.flags & 0x0FFF;
+        uint16_t name_len = idx_entry.flags & 0x0FFF;
         if ((size_t)(n + name_len) > index->len) {
             errno = EINVAL;
             fprintf(stderr, "Path data exceeds buffer\n");
@@ -436,18 +458,15 @@ int ls_files() {
     }
 
     index_state_t index;
-    buf_t idx_contents;
-    buf_init(&idx_contents);
 
-    if (init_index(base, &index, &idx_contents) < 0) {
+
+    if (init_index(base, &index) < 0) {
         free_index_state(&index);
-        free_buf(&idx_contents);
         return -1;
     }
 
     read_index(&index);
 
     free_index_state(&index);
-    free_buf(&idx_contents);
     return 0;
 }

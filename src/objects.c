@@ -20,12 +20,15 @@ void buf_init(buf_t *b) {
 }
 
 void free_buf(buf_t *b) {
+    if (b->data == NULL) {
+        return;
+    }
     free(b->data);
 }
 
 /// @brief Reserves capacity in the array. Does not update the length field.
 /// @param b Pointer to a buf_t byte array
-/// @param s Total capacity needed.
+/// @param s Total capacity needed. The value is not added to the current capacity.
 void buf_reserve(buf_t *b, size_t s) {
     if (b->cap < s) {
         size_t new_cap = s;
@@ -261,16 +264,16 @@ int read_object(buf_t *object_contents, char object_folder[], const char* oid_na
         return -1;
     };
 
+    if ((obj_fd = open(f_path, O_RDONLY)) < 0) {
+        return -1;
+    }
+
     struct stat stat_buf = { 0 };
-    if (stat(f_path, &stat_buf) < 0) {
+    if (fstat(obj_fd, &stat_buf) < 0) {
         fprintf(stderr, "Could not open source file %s (%s)\n", f_path, strerror(errno));
         return -1;
     }
     buf_reserve(object_contents, stat_buf.st_size);
-
-    if ((obj_fd = open(f_path, O_RDONLY)) < 0) {
-        return -1;
-    }
 
     int b_read;
     if ((b_read = read(obj_fd, object_contents->data, object_contents->cap)) < 0) {
@@ -330,23 +333,30 @@ int read_contents(buf_t *src, header_t *header) {
     unsigned char *nul = memchr(src->data, '\0', src->len);
     if (nul == NULL) return -1;
     size_t header_len = (size_t)(nul - src->data + 1);
-    char content_buf[header->size + 1];
+    size_t data_size = header->size + 1;
+    buf_t contents = { 0 };
+    buf_init(&contents);
+    buf_reserve(&contents, data_size);
+    // char content_buf[header->size + 1];
 
     if (header->obj_type == OBJ_BLOB) {
-        memcpy(content_buf, src->data + header_len, header->size);
-        content_buf[header->size] = '\0'; // Null terminator for printing
-        printf("%s", content_buf);
+        memcpy(contents.data, src->data + header_len, header->size);
+        contents.len += data_size;
+        contents.data[header->size] = '\0'; // Null terminator for printing
+        printf("%s", contents.data);
     }
 
     if (header->obj_type == OBJ_TREE) {
-        memcpy(content_buf, src->data + header_len, header->size);
-        read_tree(content_buf, header->size);
+        memcpy(contents.data, src->data + header_len, header->size);
+        contents.len += data_size;
+        read_tree(contents.data, header->size);
     }
 
     if (header->obj_type == OBJ_COMMIT) {
         printf("Not implemented for commits.\n");
     }
 
+    free_buf(&contents);
     return 0;
 }
 

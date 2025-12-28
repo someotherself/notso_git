@@ -19,23 +19,25 @@
 int create_blob(oid_t *oid, int fd, buf_t *obj, size_t size) {
     char header[64];
 
-    int header_len = snprintf(header, sizeof(header), "blob %zu", size) + 1;
+    size_t header_len = snprintf(header, sizeof(header), "blob %zu", size) + 1;
 
-    if (header_len <= 0 || (size_t)header_len > sizeof(header)) {
+    if (header_len <= 0 || header_len > sizeof(header)) {
         return -1;
     }
 
-    if (buf_append(obj, header, (size_t)header_len) < 0) {
+    if (buf_append(obj, header, header_len) < 0) {
         return -1;
     }
 
-    buf_reserve(obj, size);
-    unsigned char tmp[size];
-    ssize_t n = read_all(fd, tmp, size);
-    if (n < 0) {
+    size_t off = obj->len; // content already existing in the array
+
+    buf_reserve(obj, size + header_len);
+    ssize_t n = read_all(fd, obj->data + off, size);
+    if (n < 0 || (size_t)n != size) {
+        errno = EIO;
         return -1;
     }
-    buf_append(obj, tmp, size);
+    obj->len += n;
 
     // Create the SHA1
     SHA_CTX ctx;
@@ -179,7 +181,7 @@ int hash_object(oid_t *oid, int write, char *file) {
     }
 
     struct stat stat_buf;
-    if (stat(file, &stat_buf) < 0) {
+    if (fstat(fd, &stat_buf) < 0) {
         fprintf(stderr, "Could not check stats %s (%s)\n", file, strerror(errno));
         close(fd);
         return -1;

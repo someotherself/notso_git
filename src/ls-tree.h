@@ -3,7 +3,7 @@
 
 #include "objects.h"
 
-int ls_tree();
-int read_tree(char *contents, size_t content_len);
+int ls_tree(char *oid_name);
+int read_tree(unsigned char *contents, size_t content_len);
 
 #endif
