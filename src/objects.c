@@ -20,10 +20,8 @@ void buf_init(buf_t *b) {
 }
 
 void free_buf(buf_t *b) {
-    if (b->data == NULL) {
-        return;
-    }
     free(b->data);
+    b->data = NULL;
 }
 
 /// @brief Reserves capacity in the array. Does not update the length field.
